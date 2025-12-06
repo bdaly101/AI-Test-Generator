@@ -1,0 +1,91 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
+
+describe('{{functionName}} Edge Function', () => {
+  let supabase: ReturnType<typeof createClient>;
+
+  beforeAll(() => {
+    // TODO: Environment-specific config
+    supabase = createClient(
+      process.env.SUPABASE_URL || 'http://localhost:54321',
+      process.env.SUPABASE_ANON_KEY || 'your-anon-key'
+    );
+  });
+
+  afterAll(() => {
+    // TODO: Cleanup test data if needed
+  });
+
+{{#each testCases}}
+  describe('{{this.method}} requests', () => {
+    {{#if this.requiresAuth}}
+    it('should handle authenticated {{this.methodLower}} request', async () => {
+      // TODO: Add test data setup
+      const response = await supabase.functions.invoke('{{../functionName}}', {
+        method: '{{this.method}}',
+        {{#if this.hasBody}}
+        body: { /* TODO: Add request body */ },
+        {{/if}}
+        headers: {
+          Authorization: `Bearer ${process.env.TEST_USER_TOKEN || 'test-token'}`,
+        },
+      });
+
+      expect(response.error).toBeNull();
+      // TODO: Verify response data
+      expect(response.data).toBeDefined();
+    });
+
+    it('should reject unauthenticated {{this.methodLower}} request', async () => {
+      const response = await supabase.functions.invoke('{{../functionName}}', {
+        method: '{{this.method}}',
+        {{#if this.hasBody}}
+        body: {},
+        {{/if}}
+      });
+
+      // TODO: Verify expected error response
+      expect(response.error).toBeDefined();
+    });
+    {{else}}
+    it('should handle {{this.methodLower}} request', async () => {
+      // TODO: Add test data setup
+      const response = await supabase.functions.invoke('{{../functionName}}', {
+        method: '{{this.method}}',
+        {{#if this.hasBody}}
+        body: { /* TODO: Add request body */ },
+        {{/if}}
+      });
+
+      expect(response.error).toBeNull();
+      // TODO: Verify response data
+      expect(response.data).toBeDefined();
+    });
+    {{/if}}
+
+    {{#if this.hasDbOperations}}
+    it('should handle {{this.methodLower}} request with database operations', async () => {
+      // TODO: Mock database responses
+      // TODO: Add test data setup
+      const response = await supabase.functions.invoke('{{../functionName}}', {
+        method: '{{this.method}}',
+        {{#if this.hasBody}}
+        body: { /* TODO: Add request body */ },
+        {{/if}}
+        {{#if ../requiresAuth}}
+        headers: {
+          Authorization: `Bearer ${process.env.TEST_USER_TOKEN || 'test-token'}`,
+        },
+        {{/if}}
+      });
+
+      expect(response.error).toBeNull();
+      // TODO: Verify database operations were performed correctly
+      expect(response.data).toBeDefined();
+    });
+    {{/if}}
+  });
+
+{{/each}}
+});
+

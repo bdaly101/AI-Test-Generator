@@ -1,0 +1,38 @@
+{
+  "$schema": "https://ai-test-gen.dev/schema.json",
+  "framework": "auto",
+  "outputDir": "__tests__/generated",
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+  "ai": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.3,
+    "maxTokens": 4096
+  },
+  "github": {
+    "mode": "comment",
+    "updateExisting": true,
+    "createPR": false
+  },
+  "supabase": {
+    "enabled": true,
+    "functionsDir": "supabase/functions"
+  },
+  "todos": {
+    "style": "inline",
+    "markers": [
+      "TODO",
+      "FIXME",
+      "MANUAL"
+    ]
+  }
+}
+

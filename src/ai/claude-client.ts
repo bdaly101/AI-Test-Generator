@@ -1,9 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '../utils/logger.js';
 
 export interface TestGenerationRequest {
   diff: string;
   testFramework: 'vitest' | 'jest';
   includeEdgeFunctionTests: boolean;
+  systemPrompt?: string;
+  userPrompt?: string;
 }
 
 export interface TestGenerationResponse {
@@ -11,26 +14,44 @@ export interface TestGenerationResponse {
   reasoning: string;
 }
 
+export interface ClaudeClientOptions {
+  apiKey: string;
+  model?: string;
+  maxRetries?: number;
+  retryDelay?: number;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 export class ClaudeClient {
   private client: Anthropic;
   private model: string;
+  private maxRetries: number;
+  private retryDelay: number;
+  private maxTokens: number;
+  private temperature: number;
 
-  constructor(apiKey: string, model: string = 'claude-3-5-sonnet-20241022') {
-    if (!apiKey) {
+  constructor(options: ClaudeClientOptions) {
+    if (!options.apiKey) {
       throw new Error('Anthropic API key is required');
     }
-    this.client = new Anthropic({ apiKey });
-    this.model = model;
+    this.client = new Anthropic({ apiKey: options.apiKey });
+    this.model = options.model || 'claude-3-5-sonnet-20241022';
+    this.maxRetries = options.maxRetries || 3;
+    this.retryDelay = options.retryDelay || 1000;
+    this.maxTokens = options.maxTokens || 4096;
+    this.temperature = options.temperature ?? 0.3;
   }
 
   async generateTests(request: TestGenerationRequest): Promise<TestGenerationResponse> {
-    const systemPrompt = this.buildSystemPrompt(request.testFramework, request.includeEdgeFunctionTests);
-    const userPrompt = this.buildUserPrompt(request.diff);
+    const systemPrompt = request.systemPrompt || this.buildSystemPrompt(request.testFramework, request.includeEdgeFunctionTests);
+    const userPrompt = request.userPrompt || this.buildUserPrompt(request.diff);
 
-    try {
+    return this.executeWithRetry(async () => {
       const message = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4096,
+        max_tokens: this.maxTokens,
+        temperature: this.temperature,
         messages: [
           {
             role: 'user',
@@ -46,12 +67,67 @@ export class ClaudeClient {
       }
 
       return this.parseResponse(content.text);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to generate tests: ${error.message}`);
+    });
+  }
+
+  private async executeWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if it's a rate limit error
+        const isRateLimit = this.isRateLimitError(lastError);
+        const isRetryable = this.isRetryableError(lastError);
+
+        if (!isRetryable || attempt === this.maxRetries) {
+          throw lastError;
+        }
+
+        // Calculate exponential backoff delay
+        const delay = isRateLimit
+          ? this.retryDelay * Math.pow(2, attempt) * 2 // Longer delay for rate limits
+          : this.retryDelay * Math.pow(2, attempt);
+
+        logger.warn(
+          `Request failed (attempt ${attempt + 1}/${this.maxRetries + 1}): ${lastError.message}. Retrying in ${delay}ms...`
+        );
+
+        await this.sleep(delay);
       }
-      throw error;
     }
+
+    throw lastError || new Error('Unknown error occurred');
+  }
+
+  private isRateLimitError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('rate limit') ||
+      message.includes('429') ||
+      message.includes('too many requests')
+    );
+  }
+
+  private isRetryableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    return (
+      this.isRateLimitError(error) ||
+      message.includes('timeout') ||
+      message.includes('network') ||
+      message.includes('econnreset') ||
+      message.includes('enotfound') ||
+      message.includes('500') ||
+      message.includes('502') ||
+      message.includes('503')
+    );
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private buildSystemPrompt(testFramework: string, includeEdgeFunctionTests: boolean): string {

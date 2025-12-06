@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createInitCommand } from './commands/init.js';
 import { createGenerateCommand } from './commands/generate.js';
+import { createAnalyzeCommand } from './commands/analyze.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +25,7 @@ program
 // Register commands
 program.addCommand(createInitCommand());
 program.addCommand(createGenerateCommand());
+program.addCommand(createAnalyzeCommand());
 
 // Parse arguments
 program.parse();
