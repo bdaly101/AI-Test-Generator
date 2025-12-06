@@ -1,0 +1,8 @@
+{
+  "testFramework": "vitest",
+  "outputDir": "__tests__/generated",
+  "model": "claude-3-5-sonnet-20241022",
+  "includeEdgeFunctionTests": false,
+  "autoCommit": false,
+  "branchPrefix": "test-gen"
+}
