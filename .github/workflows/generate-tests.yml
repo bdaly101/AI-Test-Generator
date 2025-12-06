@@ -1,0 +1,81 @@
+name: Generate Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to generate tests for'
+        required: false
+      branch:
+        description: 'Branch to compare against (default: main)'
+        required: false
+        default: 'main'
+
+jobs:
+  generate-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Generate tests for PR
+        if: github.event_name == 'pull_request'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node dist/cli/index.js generate \
+            --pr ${{ github.event.pull_request.number }} \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }} \
+            --comment
+
+      - name: Generate tests for manual workflow
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node dist/cli/index.js generate \
+            --pr ${{ github.event.inputs.pr_number }} \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }} \
+            --comment
+
+      - name: Generate tests for branch comparison
+        if: github.event_name == 'workflow_dispatch' && !github.event.inputs.pr_number
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node dist/cli/index.js generate \
+            --branch ${{ github.event.inputs.branch || 'main' }} \
+            --commit
+
+      - name: Upload generated tests
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: generated-tests
+          path: __tests__/generated/
+          if-no-files-found: ignore
