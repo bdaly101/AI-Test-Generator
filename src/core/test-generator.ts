@@ -58,15 +58,11 @@ export class TestGenerator {
     };
   }
 
-  private getTestFileName(sourceFileName: string, testFramework: string): string {
+  private getTestFileName(sourceFileName: string, _testFramework: string): string {
     // Remove extension
     const nameWithoutExt = sourceFileName.replace(/\.(ts|js|tsx|jsx)$/, '');
     
-    // Add test suffix based on framework
-    if (testFramework === 'vitest') {
-      return `${nameWithoutExt}.test.ts`;
-    } else {
-      return `${nameWithoutExt}.test.ts`;
-    }
+    // Add test suffix
+    return `${nameWithoutExt}.test.ts`;
   }
 }
